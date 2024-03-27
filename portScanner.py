@@ -15,12 +15,13 @@ class PortScanner:
     _port_list_top_1000 = portlist.port_list_top_1000
     _port_list_top_100 = portlist.port_list_top_100
     _port_list_top_50 = portlist.port_list_top_50
-    
+
     #默认的线程控制数
     thread_limit = 1000
 
     #默认等待时间限制
     delay_time = 10
+
 
     def __init__(self, target_ports = None):
         """
@@ -28,11 +29,24 @@ class PortScanner:
         :param target_port: 默认是None
         """
         if target_ports is None:
-            self.target_ports = self._port_list_top_1000
+            self.target_ports = self.get_all_ports()
         elif type(target_ports) == list:
             self.target_ports = target_ports
         elif type(target_ports) == int:
             self.target_ports = self.check_default_list(target_ports)
+
+    def get_all_ports(self):
+        """
+        所有端口号
+        """
+        port_index = 0
+        port_list_all = []
+
+        while port_index <= 65535:
+            port_list_all.append(port_index)
+            port_index += 1
+
+        return port_list_all
 
     def check_default_list(self, target_port_rank):
         """
@@ -42,14 +56,14 @@ class PortScanner:
         if target_port_rank != 50 and target_port_rank != 100 and target_port_rank != 1000:
             print('Invalid port rank %s. should be 50, 100 or 1000' % target_port_rank)
             exit(0)
-        
+
         if target_port_rank == 50:
             return self._port_list_top_50
         elif target_port_rank == 100:
             return self._port_list_top_100
         elif target_port_rank == 1000:
             return  self._port_list_top_1000
-    
+
     def scan(self, host_name, message=''):
         """
         检查输入的hostname 是否正确
@@ -59,10 +73,10 @@ class PortScanner:
         host_name = str(host_name)
         if 'http://' in host_name or 'https://' in host_name:
             host_name = host_name[host_name.find('://')+3:]
-        
+
         print('*'*60 + '\n')
         print('start scanning website: {}'.format(host_name))
-        
+
         #获取IP地址
         try:
             server_ip = socket.gethostbyname(host_name)
@@ -70,7 +84,7 @@ class PortScanner:
         except socket.error:
             print('hostname {} unknown'.format(host_name))
             return {}
-        
+
         start_time = time.time()
         output = self.scan_port(server_ip, self.delay_time, message.encode('utf-8'))
         stop_time = time.time()
@@ -79,7 +93,7 @@ class PortScanner:
         print('finished scan!\n')
 
         return output
-            
+
     def set_thread_limit(self, limit):
         """
         设置最大的扫描线程数
@@ -92,7 +106,7 @@ class PortScanner:
             )
         else:
             self.thread_limit = limit
-        
+
     def set_delay(self, delay):
         """
         设置结束等待连接的秒数
@@ -106,14 +120,14 @@ class PortScanner:
         else:
             self.delay_time = delay
         print ('Current timeout delay is {} seconds.'.format(self.delay_time))
-    
+
     def show_thread_limit(self):
         """
         返回当前线程数
         """
         print('current thread number is {} '.format(self.thread_limit))
         return self.thread_limit
-    
+
     def show_target_ports(self):
         """
         返回当前端口列表
@@ -121,7 +135,7 @@ class PortScanner:
         print('Current port list is:')
         print(self.target_ports)
         return self.target_ports
-    
+
     def show_delay_time(self):
         """
         返回已设置等待连接的秒数
@@ -144,14 +158,14 @@ class PortScanner:
         开启多线程扫描
         """
         port_index = 0
-        
+
         while port_index < len(self.target_ports):
             while threading.activeCount() < self.thread_limit and port_index < len(self.target_ports):
                 thread = threading.Thread(target=self.TCP_connect, args=(ip, self.target_ports[port_index], delay_time, output, message))
                 thread.start()
                 port_index += 1
             time.sleep(0.01)
-    
+
     def scan_port(self, ip, delay_time, message):
         """
         控制scan_port_helper函数
@@ -165,14 +179,14 @@ class PortScanner:
         while len(output) < len(self.target_ports):
             time.sleep(0.01)
             continue
-        
+
         #输出开放的端口
         for port in self.target_ports:
             if output[port] == 'OPEN':
                 print('{} : {}\n'.format(port, output[port]))
-        
+
         return output
-    
+
     def TCP_connect(self, ip, port_number, delay_time, output, message):
         """
         使用TCP握手对给定IP地址上的端口执行状态检查
@@ -188,20 +202,20 @@ class PortScanner:
             TCP_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
             TCP_sock.settimeout(delay_time)
 
-        
+
         try:
             result = TCP_sock.connect_ex((ip, int(port_number)))
             if message != '':
                 TCP_sock.sendall(message)
-            
+
             #如果成功返回0
             if result == 0:
                 output[port_number] = 'OPEN'
             else:
                 output[port_number] = 'CLOSE'
-            
+
             TCP_sock.close()
-        
+
         except socket.error as e:
             #如果失败，意味着端口可能关闭
             output[port_number] = 'CLOSE'
